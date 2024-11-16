@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app:
+    build: app/
+    ports:
+      - "8000:8000"
+    networks:
+      - mynetwork
+    depends_on:
+      - postgres
+
+  postgres:
+    container_name: postgres_container
+    image: postgres
+    environment:
+      - POSTGRES_DB=app_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - log_destination=stderr
+      - logging_collector=on
+      - log_directory=db_log
+      - log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+      - log_statement=all
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./db:/var/lib/postgresql/data
+      - ./db_log:/var/lib/postgresql/pg_log
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
