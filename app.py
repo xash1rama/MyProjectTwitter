@@ -1,15 +1,12 @@
-from os import write
-
 import uvicorn
-from ..database.database import engine, session, Base
-from ..database.models import User, Tweet, Like, Media, Follower
+from database.database import engine, session, Base
+from database.models import User, Tweet, Like, Media, Follower
 from sqlalchemy import delete, join, outerjoin, desc
 from sqlalchemy.future import select
 from fastapi import FastAPI, Header, Depends, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 import aiofiles
-from ..schemas.schemas import TweetCreate
+from schemas.schemas import TweetCreate
 
 app = FastAPI()
 
@@ -17,7 +14,7 @@ app.mount("/", StaticFiles(directory="static"), name="static")
 
 API_KEY_NOW = ""
 TEST_NAME = "Test"
-PATH_IMAGE = f"../static/images/"
+PATH_IMAGE = f"static/images/"
 
 
 async def get_client_token(api_key: str = Header(...)):
@@ -27,24 +24,51 @@ async def get_client_token(api_key: str = Header(...)):
     return api_key_now
 
 
+
 @app.on_event("startup")
 async def startup_event():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    async with session() as sync_ses:
-        user_test = User()
-        user_test.api_key = TEST_NAME
-        user_test.name = TEST_NAME + " Frank"
-        api_key_now = TEST_NAME
+    # async with session() as sync_ses:
+    #     user_test = User()
+    #     user_test.api_key = TEST_NAME
+    #     user_test.name = TEST_NAME + " Frank"
+    #     api_key_now = TEST_NAME
+    #     sync_ses.add(user_test)
+    #     await sync_ses.commit()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    await engine.dispose()
+
     async with session() as sync_ses:
         query = sync_ses.delete(User).were(User.api_key == TEST_NAME)
         sync_ses.execute(query)
     await session.close()
     await engine.dispose()
+
+#
+# @app.lifespan
+# async def lifespan(app):
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+#     async with session() as sync_ses:
+#         user_test = User()
+#         user_test.api_key = TEST_NAME
+#         user_test.name = TEST_NAME + " Frank"
+#         api_key_now = TEST_NAME
+#         sync_ses.add(user_test)
+#         await sync_ses.commit()
+#     yield
+#     async with session() as sync_ses:
+#         query = sync_ses.delete(User).were(User.api_key == TEST_NAME)
+#         sync_ses.execute(query)
+#     await session.close()
+#     await engine.dispose()
+
+
+
 
 
 @app.post("/api/tweets")

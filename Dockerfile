@@ -1,5 +1,4 @@
 FROM python:3.12
-USER root
 RUN mkdir /app
 
 RUN apt-get update && apt-get install -y python3-dev supervisor nginx \
@@ -8,10 +7,15 @@ RUN apt-get update && apt-get install -y python3-dev supervisor nginx \
 COPY requirements.txt /app
 RUN pip install -r /app/requirements.txt
 
-COPY . /app
+COPY .flake8 /app/
+COPY app.py /app/
+COPY database /app/database
+COPY schemas /app/schemas/
+COPY static /app/static/
+COPY mypy.ini /app/
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY uwsgi.ini /etc/uwsgi/uwsgi.ini
+COPY supervisord.ini /etc
+WORKDIR app/
 
-
-WORKDIR /app
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.ini"]
-ENTRYPOINT ["gunicorn", "app:app", "-b", "0.0.0.0:8000"]
+CMD ["uvicorn", "app:app"]

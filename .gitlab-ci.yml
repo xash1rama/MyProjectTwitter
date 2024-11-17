@@ -1,9 +1,8 @@
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_PIPELINE_SOURCE == 'branches'
 
-image: python:3.8
+image: python:3.12
 
 
 stages:
@@ -16,8 +15,7 @@ before_script:
 unittest:
   stage: test
   script:
-    - cd src/
-    - uvicorn main:app
+    - gunicorn app:app
     - APP_PID=$!  
     - sleep 5  
     - curl http://127.0.0.1:8000/
@@ -28,19 +26,31 @@ unittest:
 mypy:
   stage: test
   script:
-    - mypy src/
+    - mypy app.py
+    - mypy schemas/
+    - mypy database/database
+    - mypy database/models
 
 isort: 
   stage: test
   script:
-    - isort --check-only --profile black src/
+    - isort --check-only --profile black app.py
+    - isort --check-only --profile black schemas/
+    - isort --check-only --profile black database/database
+    - isort --check-only --profile black database/models
 
 black:
   stage: test
   script:
-    - black --diff --check src/
+    - black --diff --check app.py
+    - black --diff --check schemas/
+    - black --diff --check database/database
+    - black --diff --check database/models
 
 flask8:
   stage: test
   script:
-    - flake8 src/
+    - flake8 app.py
+    - flake8 schemas/
+    - flake8 database/models
+    - flake8 database/database
