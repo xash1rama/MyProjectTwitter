@@ -1,14 +1,13 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, LargeBinary, ForeignKey, ARRAY, DATETIME
+from sqlalchemy import Column, Integer, String, ForeignKey, ARRAY, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql+asyncpg://username:password@localhost/dbname"
-
+DATABASE_URL = "postgresql+asyncpg://admin:admin@postgres_container:5432/tweet_db"
 engine = create_async_engine(DATABASE_URL, echo=True)
-async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-session = async_session()
+session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 Base = declarative_base()
 
 
@@ -18,12 +17,18 @@ class User(Base):
     id: int = Column(Integer, primary_key=True, autoincrement=True)
     name: str = Column(String, nullable=False)
     api_key: str = Column(String, nullable=False)
-    follower = relationship(
-        "Follower", back_populates="user_follower", lazy="select", cascade="all"
-    )
-    following = relationship(
-        "Follower", back_populates="user_following", lazy="select", cascade="all"
-    )
+    followers = relationship("Follower",
+                             back_populates="user_following",
+                             foreign_keys="[Follower.following_id]",
+                             lazy="select",
+                             cascade="all"
+                             )
+    following = relationship("Follower",
+        back_populates="user_follower",
+                             foreign_keys="[Follower.follower_id]",
+                             lazy="select",
+                             cascade="all"
+                             )
     tweet = relationship(
         "Tweet", back_populates="user_tweet", lazy="select", cascade="all"
     )
@@ -40,7 +45,7 @@ class Tweet(Base):
     user_id: int = Column(Integer, ForeignKey("users.id"))
     tweet_data: str = Column(String, nullable=False)
     tweet_media_ids: list = Column(ARRAY(Integer), nullable=True)
-    time: datetime = Column(DATETIME, default=datetime.now())
+    time: datetime = Column(DateTime, default=datetime.now())
     user_tweet = relationship("User", back_populates="tweet")
     likes = relationship("Like", back_populates="tweet_like", cascade="all")
     tweet_media = relationship(
@@ -69,9 +74,9 @@ class Follower(Base):
 
     follower_id: int = Column(Integer, ForeignKey("users.id"), primary_key=True)
     following_id: int = Column(Integer, ForeignKey("users.id"), primary_key=True)
-    users_follower = relationship("User", back_populates="follower")
-    users_following = relationship("User", back_populates="following")
-    time: datetime = Column(DATETIME, default=datetime.now())
+    user_follower = relationship("User", foreign_keys=[follower_id], back_populates="following")
+    user_following = relationship("User", foreign_keys=[following_id], back_populates="followers")
+    time: datetime = Column(DateTime, default=datetime.now())
 
     def to_json(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

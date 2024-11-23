@@ -1,6 +1,7 @@
 import uvicorn
-from database.database import engine, session, Base
-from database.models import User, Tweet, Like, Media, Follower
+from starlette.responses import HTMLResponse
+
+from database.models import User, Tweet, Like, Media, Follower, engine, session, Base
 from sqlalchemy import delete, join, outerjoin, desc
 from sqlalchemy.future import select
 from fastapi import FastAPI, Header, Depends, HTTPException, UploadFile, File
@@ -10,7 +11,7 @@ from schemas.schemas import TweetCreate
 
 app = FastAPI()
 
-app.mount("/", StaticFiles(directory="static"), name="static")
+# app.mount("/static", StaticFiles(directory="/usr/share/nginx/index/html/static"), name="static")
 
 API_KEY_NOW = ""
 TEST_NAME = "Test"
@@ -24,18 +25,17 @@ async def get_client_token(api_key: str = Header(...)):
     return api_key_now
 
 
-
 @app.on_event("startup")
 async def startup_event():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # async with session() as sync_ses:
-    #     user_test = User()
-    #     user_test.api_key = TEST_NAME
-    #     user_test.name = TEST_NAME + " Frank"
-    #     api_key_now = TEST_NAME
-    #     sync_ses.add(user_test)
-    #     await sync_ses.commit()
+    async with session() as sync_ses:
+        user_test = User()
+        user_test.api_key = TEST_NAME
+        user_test.name = TEST_NAME + " Frank"
+        sync_ses.add(user_test)
+        await sync_ses.commit()
+
 
 
 @app.on_event("shutdown")
@@ -43,32 +43,18 @@ async def shutdown_event():
     await engine.dispose()
 
     async with session() as sync_ses:
-        query = sync_ses.delete(User).were(User.api_key == TEST_NAME)
+        query = sync_ses.delete(User).where(User.api_key == TEST_NAME)
         sync_ses.execute(query)
     await session.close()
     await engine.dispose()
 
-#
-# @app.lifespan
-# async def lifespan(app):
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.create_all)
-#     async with session() as sync_ses:
-#         user_test = User()
-#         user_test.api_key = TEST_NAME
-#         user_test.name = TEST_NAME + " Frank"
-#         api_key_now = TEST_NAME
-#         sync_ses.add(user_test)
-#         await sync_ses.commit()
-#     yield
-#     async with session() as sync_ses:
-#         query = sync_ses.delete(User).were(User.api_key == TEST_NAME)
-#         sync_ses.execute(query)
-#     await session.close()
-#     await engine.dispose()
 
 
-
+@app.get("/", response_class=HTMLResponse)
+async def read_root(api_key: str = Depends(get_client_token)):
+    with open("static/index.html", "r", encoding="utf-8") as file:
+        html_content = file.read()
+    return HTMLResponse(content=html_content)
 
 
 @app.post("/api/tweets")
@@ -82,7 +68,7 @@ async def tweets(tweet: TweetCreate, api_key: str = Depends(get_client_token)):
     try:
         async with session() as async_session:
             id_user = await async_session.execute(
-                select(User).where(User.api_key == api_key)
+                select(User).where(User.api_key==api_key)
             ).scalar_one()
             new_tweet = Tweet(
                 tweet_data=tweet.tweet_data,
@@ -102,9 +88,7 @@ async def tweets(tweet: TweetCreate, api_key: str = Depends(get_client_token)):
 
 
 @app.post("/api/medias")
-async def tweets(
-    file: UploadFile = File(...), api_key: str = Depends(get_client_token)
-):
+async def tweets(file: UploadFile = File(...), api_key: str = Depends(get_client_token)):
     """
     Endpoint для загрузки файлов из твита. Загрузка происходит через
     отправку формы.
@@ -289,9 +273,6 @@ async def all_tweets(api_key: str = Depends(get_client_token)):
     """
     try:
         async with (session() as async_session):
-            my_account = await async_session.execute(
-                select(User.id).where(User.api_key == api_key)
-            ).scalar_one()
             all_tweets_select = await async_session.execute(
                 select(
                     Tweet.id.label("id"),
@@ -307,7 +288,6 @@ async def all_tweets(api_key: str = Depends(get_client_token)):
                 .outerjoin(Like, Like.tweet_id == Tweet.id)
                 .order_by(desc(Tweet.time))
             )
-
             result = {"result": True, "tweets": []}
             for tweet in all_tweets_select:
                 tweet_info = {
