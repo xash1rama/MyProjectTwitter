@@ -1,16 +1,6 @@
 version: '3.8'
 
 services:
-  app:
-    container_name: tweet_app
-    build: .
-    ports:
-      - "8000:8000"
-    networks:
-      - mynetwork
-    depends_on:
-      - postgres
-
   postgres:
     container_name: postgres_container
     image: postgres
@@ -31,6 +21,18 @@ services:
       - ./db_log:/var/lib/postgresql/pg_log
     networks:
       - mynetwork
+
+  app:
+    container_name: tweet_app
+    build: .
+    ports:
+      - "8000:8000"
+    networks:
+      - mynetwork
+    depends_on:
+      - postgres
+
+
 
 networks:
   mynetwork:

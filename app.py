@@ -1,28 +1,27 @@
 import uvicorn
-from starlette.responses import HTMLResponse
-
 from database.models import User, Tweet, Like, Media, Follower, engine, session, Base
 from sqlalchemy import delete, join, outerjoin, desc
 from sqlalchemy.future import select
 from fastapi import FastAPI, Header, Depends, HTTPException, UploadFile, File
-from starlette.staticfiles import StaticFiles
+from fastapi.security import APIKeyHeader
 import aiofiles
 from schemas.schemas import TweetCreate
 
 app = FastAPI()
 
-# app.mount("/static", StaticFiles(directory="/usr/share/nginx/index/html/static"), name="static")
 
 API_KEY_NOW = ""
 TEST_NAME = "Test"
 PATH_IMAGE = f"static/images/"
 
+header_api_key = APIKeyHeader(name="api-key")
 
-async def get_client_token(api_key: str = Header(...)):
-    if api_key != "expected_token" and API_KEY_NOW == "":
-        raise HTTPException(status_code=400, detail="Invalid Api Key")
-    api_key_now = api_key
-    return api_key_now
+async def get_client_token(api_key: str = Depends(header_api_key)):
+    async with session() as async_session:
+        valid_api_keys = await async_session.execute(select(User.api_key)).scalar_all()
+    if api_key not in valid_api_keys:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return api_key
 
 
 @app.on_event("startup")
@@ -31,7 +30,7 @@ async def startup_event():
         await conn.run_sync(Base.metadata.create_all)
     async with session() as sync_ses:
         user_test = User()
-        user_test.api_key = TEST_NAME
+        user_test.api_key = TEST_NAME.lower()
         user_test.name = TEST_NAME + " Frank"
         sync_ses.add(user_test)
         await sync_ses.commit()
@@ -43,18 +42,11 @@ async def shutdown_event():
     await engine.dispose()
 
     async with session() as sync_ses:
-        query = sync_ses.delete(User).where(User.api_key == TEST_NAME)
-        sync_ses.execute(query)
-    await session.close()
+        query = delete(User).where(User.api_key == TEST_NAME.lower())
+        await sync_ses.execute(query)
+        await sync_ses.commit()
     await engine.dispose()
 
-
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(api_key: str = Depends(get_client_token)):
-    with open("static/index.html", "r", encoding="utf-8") as file:
-        html_content = file.read()
-    return HTMLResponse(content=html_content)
 
 
 @app.post("/api/tweets")
