@@ -19,21 +19,21 @@ services:
     volumes:
       - ./db:/var/lib/postgresql/data
       - ./db_log:/var/lib/postgresql/pg_log
-    networks:
-      - mynetwork
-
-  app:
-    container_name: tweet_app
-    build: .
-    ports:
-      - "8000:8000"
-    networks:
-      - mynetwork
-    depends_on:
-      - postgres
-
-
-
-networks:
-  mynetwork:
-    driver: bridge
+#    networks:
+#      - mynetwork
+#
+#  app:
+#    container_name: tweet_app
+#    build: .
+#    ports:
+#      - "8000:8000"
+#    networks:
+#      - mynetwork
+#    depends_on:
+#      - postgres
+#
+#
+#
+#networks:
+#  mynetwork:
+#    driver: bridge

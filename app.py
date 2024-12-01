@@ -1,117 +1,152 @@
-import uvicorn
-from database.models import User, Tweet, Like, Media, Follower, engine, session, Base
-from sqlalchemy import delete, join, outerjoin, desc
-from sqlalchemy.future import select
-from fastapi import FastAPI, Header, Depends, HTTPException, UploadFile, File
-from fastapi.security import APIKeyHeader
-import aiofiles
-from schemas.schemas import TweetCreate
+from fileinput import filename
 
+import uvicorn
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import HTMLResponse
+from starlette.staticfiles import StaticFiles
+from pathlib import Path
+from database.models import User, Tweet, Like, Media, Follower, engine, session, Base
+from sqlalchemy import delete, desc
+from sqlalchemy.future import select
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
+import aiofiles
+
+from schemas.schemas import TweetCreate, ResultUserInfoModelOut,GetTweets, TweetAdd, MediaModel, UserInfoModel, ErrorModel, TweetModel, ResultTweetsModel
+from function_for_tweeter import  get_session, get_client_token, get_following, get_followers
+from conf_app import PATH_IMAGE, API_KEY_NOW, TEST_NAME
 app = FastAPI()
 
 
-API_KEY_NOW = ""
-TEST_NAME = "Test"
-PATH_IMAGE = f"static/images/"
 
-header_api_key = APIKeyHeader(name="api-key")
 
-async def get_client_token(api_key: str = Depends(header_api_key)):
-    async with session() as async_session:
-        valid_api_keys = await async_session.execute(select(User.api_key)).scalar_all()
-    if api_key not in valid_api_keys:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-    return api_key
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.on_event("startup")
 async def startup_event():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    async with session() as sync_ses:
-        user_test = User()
-        user_test.api_key = TEST_NAME.lower()
-        user_test.name = TEST_NAME + " Frank"
-        sync_ses.add(user_test)
-        await sync_ses.commit()
+    try:
+        async with session() as sync_ses:
+            res = await sync_ses.execute(select(User).where(User.api_key == TEST_NAME.lower()))
+            res_2 = await sync_ses.execute(select(User).where(User.api_key == TEST_NAME.lower() + "_2"))
+            search = res.scalar_one_or_none()
+            search_2 = res_2.scalar_one_or_none()
 
+            if not search:
+                user_test = User(api_key=TEST_NAME.lower(), name=TEST_NAME + " Frank")
+                sync_ses.add(user_test)
+                await sync_ses.commit()
+
+                new_tweet = Tweet(tweet_data="Тестовый репост для отображения на сайте.",
+                                  user_id=user_test.id)
+                sync_ses.add(new_tweet)
+                await sync_ses.commit()
+
+                new_media = Media(filename=PATH_IMAGE+"test_3_Treehouse_of_Horror_XII.gif", tweet_id=new_tweet.id)
+                sync_ses.add(new_media)
+                await sync_ses.commit()
+
+            if not search_2:
+                user_test2 = User(api_key=TEST_NAME.lower()+ "_2" , name=TEST_NAME + " Jozaf")
+                sync_ses.add(user_test2)
+                await sync_ses.commit()
+
+                follower = Follower(follower_id = user_test.id, following_id=user_test2.id)
+                sync_ses.add(follower)
+                await sync_ses.commit()
+
+                new_tweet = Tweet(tweet_data="Тестовый репост для отображения на сайте 2.",
+                                  user_id=user_test.id,)
+                sync_ses.add(new_tweet)
+                await sync_ses.commit()
+
+    except Exception as e:
+        print(e)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await engine.dispose()
+    try:
+        async with session() as async_sess:
+            async with async_sess.begin():
+                result = await async_sess.execute(select(User).where(User.api_key == TEST_NAME.lower()))
+                user = result.scalar_one_or_none()
+                if user:
+                    await async_sess.execute(delete(Tweet).where(Tweet.user_id == user.id))
+                    await async_sess.execute(delete(User).where(User.api_key == TEST_NAME.lower()))
+                    await async_sess.commit()
 
-    async with session() as sync_ses:
-        query = delete(User).where(User.api_key == TEST_NAME.lower())
-        await sync_ses.execute(query)
-        await sync_ses.commit()
-    await engine.dispose()
+    except Exception as e:
+        print(e)
+    finally:
+        await engine.dispose()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    file_path = Path("static/index.html")
+    return HTMLResponse(content=file_path.read_text(), status_code=200)
 
 
 
-@app.post("/api/tweets")
-async def tweets(tweet: TweetCreate, api_key: str = Depends(get_client_token)):
+@app.post("/api/tweets", response_model=TweetAdd)
+async def tweets(tweet:TweetCreate, api_key: str = Depends(get_client_token), async_session: AsyncSession = Depends(get_session)):
     """
     Запросом на этот endpoint пользователь будет создавать новый твит.
     Бэкенд будет его валидировать и сохранять в базу.
     :param api_key:str Получение ключа (Имитация сессии)
     :return:dict  В ответ должен вернуться id созданного твита.
     """
+    print(tweet)
     try:
-        async with session() as async_session:
-            id_user = await async_session.execute(
-                select(User).where(User.api_key==api_key)
-            ).scalar_one()
-            new_tweet = Tweet(
-                tweet_data=tweet.tweet_data,
-                tweet_media_ids=tweet.tweet_media_ids,
-                user_id=id_user,
-            )
-            await async_session.add(new_tweet)
-            await async_session.commit()
-        result = {"result": True, "tweet_id": new_tweet.id}
-        return result
+        result = await async_session.execute(
+            select(User).where(User.api_key==api_key)
+        )
+        id_user = result.scalar_one_or_none()
+        new_tweet = Tweet(
+            tweet_data=str(tweet.tweet_data),
+            user_id=id_user.id
+        )
+        async_session.add(new_tweet)
+        await async_session.commit()
+        await async_session.refresh(new_tweet)
+        for media_id in tweet.tweet_media_ids:
+            media = await async_session.execute(select(Media).where(Media.id == media_id))
+            media_instance = media.scalar_one_or_none()
+            if media_instance:
+                media_instance.tweet_id = new_tweet.id
+                async_session.add(media_instance)
+        await async_session.commit()
+
+        return {"result":True, "tweet_id":new_tweet.id}
     except Exception as er:
-        return {
-            "result": False,
-            "error_type": str(type(er).__name__),
-            "error_message": str(er),
-        }
+        return ErrorModel(
+            result=False,
+            error_type=str(type(er).__name__),
+            error_message=str(er),
+        )
 
 
-@app.post("/api/medias")
-async def tweets(file: UploadFile = File(...), api_key: str = Depends(get_client_token)):
-    """
-    Endpoint для загрузки файлов из твита. Загрузка происходит через
-    отправку формы.
-    :param api_key:str Получение ключа (Имитация сессии)
-    :return:dict  В ответ должно вернуться сообщение о статусе операции.
-    """
+@app.post("/api/medias", response_model=MediaModel)
+async def upload_media(file: UploadFile = File(...), api_key: str = Depends(get_client_token), async_session: AsyncSession = Depends(get_session)):
     try:
-        async with session() as async_session:
-            last_id = await async_session.execute(
-                select(Media.id).order_by(Media.id.desc()).limit(1)
-            ).scalar_one_or_none()
-            await async_session.commit()
-        if last_id is not None:
-            filename = f"{api_key + file.filename + str(last_id + 1)}"
+        last_id_result = await async_session.execute(
+            select(Media.id).order_by(Media.id.desc()).limit(1)
+        )
+        last_id = last_id_result.scalar_one_or_none()
 
-        else:
-            filename = f"{api_key + file.filename + str(last_id)}1"
+        filename = f"{api_key}_{(last_id + 1) if last_id is not None else 1}_{file.filename}"
 
         contents = await file.read()
         async with aiofiles.open(PATH_IMAGE + filename, "wb") as file_save:
             await file_save.write(contents)
 
-        async with session() as async_session:
-            safe_image = Media(filename=filename)
-            last_id = await async_session.execute(
-                select(Media.id).order_by(Media.id.desc()).limit(1)
-            ).scalar_one_or_none()
-            await async_session.add(safe_image)
-            await async_session.commit()
-        result = {"result": True, "media_id": last_id}
-        return result
+        safe_image = Media(filename=filename)
+        print("*" * 10, safe_image.to_json())
+        async_session.add(safe_image)
+        await async_session.commit()
+        return MediaModel(result=True, media_id=safe_image.id)
 
     except Exception as er:
         return {
@@ -119,6 +154,7 @@ async def tweets(file: UploadFile = File(...), api_key: str = Depends(get_client
             "error_type": str(type(er).__name__),
             "error_message": str(er),
         }
+
 
 
 @app.delete("/api/tweets/<id>")
@@ -254,110 +290,96 @@ async def unfollow(id: int, api_key: str = Depends(get_client_token)):
         }
 
 
-@app.get("/api/tweets")
-async def all_tweets(api_key: str = Depends(get_client_token)):
+
+@app.get("/api/tweets", response_model=ResultTweetsModel|ErrorModel)
+async def get_user_tweets(api_key: str = Depends(get_client_token), async_session: AsyncSession = Depends(get_session)):
     """
-    Пользователь может получить ленту с твитами.
-    :param api_key:str Получение ключа (Имитация сессии)
-    :return:dict
-    В ответ должен вернуться json со списком твитов для ленты этого
-    пользователя.
+    Получает твиты текущего пользователя и информацию о его подписчиках.
     """
     try:
-        async with (session() as async_session):
-            all_tweets_select = await async_session.execute(
-                select(
-                    Tweet.id.label("id"),
-                    Tweet.tweet_data.label("content"),
-                    Tweet.tweet_media_ids.label("attachments"),
-                    User.id.label("user_id"),
-                    User.name.label("name"),
-                    Like.user_id.label("like_user_id"),
-                    Like.user_like.name.label("likes_name"),
-                )
-                .where()
-                .join(User, User.id == Tweet.user_id)
-                .outerjoin(Like, Like.tweet_id == Tweet.id)
-                .order_by(desc(Tweet.time))
-            )
-            result = {"result": True, "tweets": []}
-            for tweet in all_tweets_select:
-                tweet_info = {
-                    "id": tweet.id,
-                    "content": tweet.id,
-                    "attachments": tweet.connect,
-                    "author": {"id": tweet.user_id, "name": tweet.name},
-                    "likes": [],
-                }
-                if tweet.like_user_id:
-                    tweet_info["likes"].append(
-                        {"user_id": tweet.like_user_id, "name": tweet.likes_name}
-                    )
-                result["tweets"].append(tweet_info)
-            await async_session.commit()
-        return result
+        result = await async_session.execute(
+            select(User).where(User.api_key == api_key)
+        )
+        user = result.scalar_one_or_none()
+        result = await async_session.execute(
+            select(Tweet).where(Tweet.user_id == user.id)
+        )
+        tweets = result.scalars().all()
+        followers = user.followers
+        tweets_output = []
 
-    except Exception as er:
-        return {
-            "result": False,
-            "error_type": str(type(er).__name__),
-            "error_message": str(er),
-        }
-
-
-@app.get("/api/users/me")
-async def my_account(api_key: str = Depends(get_client_token)):
-    """
-    Пользователь может получить информацию о своём профиле
-    :param api_key:str Получение ключа (Имитация сессии)
-    :return:dict
-    """
-    try:
-        async with session() as async_session:
-            my_account_id = await async_session.execute(
-                select(User.id).where(User.api_key == api_key)
-            ).scalar_one()
-            my_account = await async_session.execute(
-                select(
-                    User.id.label("id"),
-                    User.name.label("name"),
-                    Follower.users_follower.id.label("follower_id"),
-                    Follower.users_follower.name.label("follower_name"),
-                    Follower.users_following.id.label("following_id"),
-                    Follower.users_following.name.label("following_name"),
-                )
-                .where(User.id == my_account_id)
-                .join(Follower, Follower.follower_id == User.id)
-                .outerjoin(User, User.id == Follower.following_id)
-                .order_by(desc(Follower.time))
-            )
-            result = {
-                "result": True,
-                "user": {
-                    "id": my_account.id,
-                    "name": my_account.name,
-                    "followers": [
-                        {"id": follower.follower_id, "name": follower.follower_name}
-                        for follower in my_account
-                    ],
-                    "following": [
-                        {"id": following.following_id, "name": following.following_name}
-                        for following in my_account
-                    ],
+        for tweet in tweets:
+            tweet_info = {
+                "id": tweet.id,
+                "content": tweet.tweet_data,
+                "attachments": [f"/api/medias/{media.id}" for media in tweet.medias],
+                "author": {
+                    "id": tweet.user_tweet.id,
+                    "name": tweet.user_tweet.name
                 },
+                "likes": [
+                    {
+                        "user_id": like.user_like.id,
+                        "name": like.user_like.name
+                    }
+                    for like in tweet.likes
+                ]
             }
-            await async_session.commit()
-        return result
+            tweets_output.append(tweet_info)
+
+        return ResultTweetsModel(result=True, tweets=tweets_output)
+
     except Exception as er:
         return {
-            "result": False,
-            "error_type": str(type(er).__name__),
-            "error_message": str(er),
+            "result":False,
+            "error_type":str(type(er).__name__),
+            "error_message":str(er),
         }
 
+@app.get("/api/medias/{id}")
+async def get_image(id:int, async_session: AsyncSession = Depends(get_session)):
+    result = await async_session.execute(
+        select(Media.filename).where(Media.id==id)
+    )
+    image_path = result.scalar_one()
+    try:
+        async with aiofiles.open(PATH_IMAGE+image_path, mode='rb') as file:
+            image_bytes = await file.read()
+        return Response(content=image_bytes,
+                        media_type="image/jpeg")
+    except FileNotFoundError:
+        return Response(status_code=404, content="Image not found")
 
-@app.get("/api/users/{id}")
-async def account_with_id(id: int, api_key: str = Depends(get_client_token)):
+
+@app.get("/api/users/me", response_model=ResultUserInfoModelOut)
+async def get_current_user(api_key: str = Depends(get_client_token), async_session: AsyncSession = Depends(get_session)):
+    try:
+        result = await async_session.execute(
+            select(User).where(User.api_key == api_key)
+        )
+        user = result.scalar_one()
+
+        followers = await get_followers(user.id, async_session)
+        following = await get_following(user.id, async_session)
+
+        user_info = UserInfoModel(
+            id=user.id,
+            name=user.name,
+            followers=followers,
+            following=following,
+        )
+        print(user_info)
+        return {"result":True, "user":user_info}
+
+    except Exception as er:
+        return ErrorModel(
+            result=False,
+            error_type=str(type(er).__name__),
+            error_message=str(er),
+        )
+
+@app.get("/api/users/{id}", response_model=ResultUserInfoModelOut)
+async def account_with_id(id: int, async_session: AsyncSession = Depends(get_session)):
     """
     Пользователь может получить информацию о произвольном профиле по его Id
     :param id:int Получение id Пользователя
@@ -365,11 +387,7 @@ async def account_with_id(id: int, api_key: str = Depends(get_client_token)):
     :return:dict
     """
     try:
-        async with session() as async_session:
-            my_account_id = await async_session.execute(
-                select(User.id).where(User.api_key == api_key)
-            ).scalar_one()
-            my_account = await async_session.execute(
+        result = await async_session.execute(
                 select(
                     User.id.label("id"),
                     User.name.label("name"),
@@ -383,30 +401,15 @@ async def account_with_id(id: int, api_key: str = Depends(get_client_token)):
                 .outerjoin(User, User.id == Follower.following_id)
                 .order_by(desc(Follower.time))
             )
-            result = {
-                "result": True,
-                "user": {
-                    "id": my_account.id,
-                    "name": my_account.name,
-                    "followers": [
-                        {"id": follower.follower_id, "name": follower.follower_name}
-                        for follower in my_account
-                    ],
-                    "following": [
-                        {"id": following.following_id, "name": following.following_name}
-                        for following in my_account
-                    ],
-                },
-            }
-            await async_session.commit()
-        return result
+        account_uses = result.scalar_one()
+        return ResultUserInfoModelOut(result=True, user=account_uses)
 
     except Exception as er:
-        return {
-            "result": False,
-            "error_type": str(type(er).__name__),
-            "error_message": str(er),
-        }
+        return ErrorModel(
+            result = False,
+            error_type = str(type(er).__name__),
+            error_message = str(er),
+        )
 
 
 if __name__ == "__main__":
