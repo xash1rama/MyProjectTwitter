@@ -29,7 +29,7 @@ class LikeModel(BaseModel):
     user_id: int
     name: str
 
-class TweetModel(ResultModel):
+class TweetModel(BaseModel):
     id: int
     content: str
     attachments: List[str]
@@ -63,8 +63,8 @@ class UserModel(BaseModel):
 
 class UserInfoModel(UserModel):
     """Модель пользователя для возвращения ему"""
-    followers: List[UserModel]
-    following: List[UserModel]
+    followers: Optional[List[UserModel]]=[]
+    following: Optional[List[UserModel]]=[]
 
 class ResultUserInfoModelOut(ResultModel):
     """Возвращает полную информацию о пользователе"""
