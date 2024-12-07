@@ -30,9 +30,8 @@ class User(Base):
                              cascade="all"
                              )
     tweets = relationship(
-        "Tweet", back_populates="user_tweet", lazy="select", cascade="all"
-    )
-    likes = relationship("Like", back_populates="user_like", cascade="all")
+        "Tweet", back_populates="user_tweet", lazy="select", cascade="all")
+    likes = relationship("Like", back_populates="user_like", lazy="select")
 
     def to_json(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -46,7 +45,7 @@ class Tweet(Base):
     tweet_data = Column(String, nullable=False)
     time = Column(DateTime, default=datetime.utcnow)
     user_tweet = relationship("User", back_populates="tweets")
-    likes = relationship("Like", back_populates="tweet_like", cascade="all")
+    likes = relationship("Like", back_populates="tweet_like", cascade="all, delete-orphan")
     medias = relationship("Media", back_populates="tweet", cascade="all, delete-orphan")
 
     def to_json(self):
@@ -56,7 +55,7 @@ class Tweet(Base):
 class Like(Base):
     __tablename__ = "likes"
 
-    id = Column("id", Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     tweet_id = Column(Integer, ForeignKey("tweets.id"))
     user_like = relationship("User", back_populates="likes")
