@@ -8,7 +8,6 @@ from routers.rout_medias import router as media_router
 from config.setup import lifespan
 
 
-
 app = FastAPI(lifespan=lifespan)
 
 
@@ -21,6 +20,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/js", StaticFiles(directory="static/js"), name="js")
 app.mount("/css", StaticFiles(directory="static/css"), name="css")
 app.mount("/images", StaticFiles(directory="static/images"), name="image")
+
+
+@app.get("/a")
+async def aa():
+    return {"aa": "aa"}
 
 
 @app.get("/", response_class=HTMLResponse)
