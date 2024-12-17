@@ -6,14 +6,14 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.future import select
 import os
+#
+# DB_LOGIN = os.getenv("DB_LOGIN")
+# DB_PASSWORD = os.getenv("DB_PASSWORD")
+# DB_HOST = os.getenv("DB_HOST")
+# DB_PORT = os.getenv("DB_PORT")
+# DB_NAME = os.getenv("DB_NAME")
 
-DB_LOGIN = os.getenv("DB_LOGIN")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-DB_NAME = os.getenv("DB_NAME")
-
-DB_URL= f"postgresql+asyncpg://{DB_LOGIN}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_URL= f"postgresql+asyncpg://admin:admin@postgres_container:5432/tweet_db"
 
 def init_db(db_url):
     engine = create_async_engine(db_url, echo=True)
