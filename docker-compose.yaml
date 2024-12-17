@@ -8,11 +8,11 @@ services:
     networks:
       - mynetwork
     environment:
-      - DB_LOGIN=${DB_LOGIN}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
+      - DB_LOGIN=admin
+      - DB_PASSWORD=admin
+      - DB_HOST=postgres_container
+      - DB_PORT=5432
+      - DB_NAME=tweet_db
     depends_on:
       - postgres
 
@@ -20,9 +20,9 @@ services:
     container_name: postgres_container
     image: postgres
     environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_LOGIN}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=tweet_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
     ports:
       - '5432:5432'
     volumes:
