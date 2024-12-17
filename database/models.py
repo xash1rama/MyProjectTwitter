@@ -5,15 +5,25 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.future import select
+import os
 
+DB_LOGIN = os.getenv("DB_LOGIN")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
 
-DATABASE_URL = "postgresql+asyncpg://admin:admin@postgres_container:5432/tweet_db"
-engine = create_async_engine(DATABASE_URL, echo=True)
-session = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+DB_URL= f"postgresql+asyncpg://{DB_LOGIN}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+def init_db(db_url):
+    engine = create_async_engine(db_url, echo=True)
+    session = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    return engine, session
+engine, session = init_db(DB_URL)
 Base = declarative_base()
 
 
