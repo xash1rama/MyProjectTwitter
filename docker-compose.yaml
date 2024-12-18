@@ -6,12 +6,6 @@ services:
       - "8000:5050"
     networks:
       - mynetwork
-    environment:
-      - DB_LOGIN=admin
-      - DB_PASSWORD=admin
-      - DB_HOST=postgres_container
-      - DB_PORT=5432
-      - DB_NAME=tweet_db
     depends_on:
       - postgres
 
