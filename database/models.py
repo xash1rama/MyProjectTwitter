@@ -13,7 +13,7 @@ import os
 # DB_PORT = os.getenv("DB_PORT")
 # DB_NAME = os.getenv("DB_NAME")
 
-DB_URL= f"postgresql+asyncpg://admin:admin@postgres_container:5432/tweet_db"
+DB_URL= f"postgresql+asyncpg://admin:admin@postgres:5432/tweet_db"
 
 def init_db(db_url):
     engine = create_async_engine(db_url, echo=True)
