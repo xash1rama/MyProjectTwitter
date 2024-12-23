@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import aiofiles
 from config.conf_app import PATH_IMAGE
 import os
+# from tasks import add_image
 
 router = APIRouter(tags=["media"])
 
@@ -46,21 +47,13 @@ async def upload_media(
 
         safe_image = Media(filename=file_name, tweet_id=last_id)
         async_session.add(safe_image)
+
         await async_session.commit()
         await async_session.refresh(safe_image)
 
         return MediaModel(result=True, media_id=safe_image.id)
 
     except Exception as er:
-        print("!" * 100)
-        print("POST medias")
-        print(
-            ErrorModel(
-                result=False,
-                error_type=str(type(er).__name__),
-                error_message=str(er),
-            )
-        )
         return ErrorModel(
             result=False,
             error_type=str(type(er).__name__),
@@ -83,6 +76,7 @@ async def get_image(id: int, async_session: AsyncSession = Depends(get_session))
         file_path = os.path.join(PATH_IMAGE, image_filename)
         if not os.path.isfile(file_path):
             raise HTTPException(status_code=404, detail="Image file does not exist")
+
         async with aiofiles.open(file_path, mode="rb") as file:
             image_bytes = await file.read()
         return Response(content=image_bytes, media_type="image/jpeg")
@@ -93,3 +87,4 @@ async def get_image(id: int, async_session: AsyncSession = Depends(get_session))
             error_type=str(type(er).__name__),
             error_message=str(er),
         )
+

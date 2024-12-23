@@ -5,14 +5,18 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.future import select
-# import os
-#
-#
-# DB_LOGIN = os.getenv("DB_LOGIN")
-# DB_PASSWORD = os.getenv("DB_PASSWORD")
-# DB_NAME = os.getenv("DB_NAME")
+import os
+from dotenv import load_dotenv
 
-DB_URL = f"postgresql+asyncpg://admin:admin@postgres:5432/tweet_db"
+load_dotenv("../.env")
+
+
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+
+DB_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@postgres:5432/{DB_NAME}"
 
 
 def init_db(db_url):
