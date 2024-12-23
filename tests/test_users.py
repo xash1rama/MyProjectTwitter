@@ -1,6 +1,7 @@
 import pytest
 from .conftest import client, test_db
 
+
 @pytest.mark.asyncio
 async def test_get_me(client, test_db):
     """Тест получения первого пользователя"""
@@ -22,6 +23,7 @@ async def test_get_me_2(client, test_db):
     assert response.json()["result"] == True
     assert response.status_code == 200
 
+
 @pytest.mark.asyncio
 async def test_get_me_invalid_api_key(client, test_db):
     """Тест получения пользователя с невалидным api-key"""
@@ -32,6 +34,7 @@ async def test_get_me_invalid_api_key(client, test_db):
     data = response.json()
     assert response.status_code == 403
     assert data["detail"] == "Invalid API key"
+
 
 @pytest.mark.asyncio
 async def test_get_another_user(client, test_db):
@@ -75,5 +78,5 @@ async def test_follow_on_invalid_user(client, test_db):
     """Тест подписки на несущетсвующего пользователя"""
 
     api_key = "test"
-    response =await client.post("/api/users/44/follow", headers={"api-key": api_key})
+    response = await client.post("/api/users/44/follow", headers={"api-key": api_key})
     assert response.json()["result"] == False

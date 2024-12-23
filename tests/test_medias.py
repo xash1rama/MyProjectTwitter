@@ -1,6 +1,7 @@
 import pytest
 from .conftest import client, test_db
 
+
 @pytest.mark.asyncio
 async def test_upload_and_view_media(client):
     """
@@ -19,7 +20,9 @@ async def test_upload_and_view_media(client):
         )
     data = response.json()
     tweet_data = {"tweet_data": "Тестовый твит", "tweet_media_ids": [data["media_id"]]}
-    res = await client.post("/api/tweets", json=tweet_data, headers={"api-key": api_key})
+    res = await client.post(
+        "/api/tweets", json=tweet_data, headers={"api-key": api_key}
+    )
 
     assert response.status_code == 200
     assert response.json()["result"] is True
@@ -29,7 +32,9 @@ async def test_upload_and_view_media(client):
 
     datas = res.json()
     tweet_id = datas["tweet_id"]
-    res = await client.delete("/api/tweets/" + str(tweet_id), headers={"api-key": api_key})
+    res = await client.delete(
+        "/api/tweets/" + str(tweet_id), headers={"api-key": api_key}
+    )
     assert res.status_code == 200
     assert res.json()["result"] is True
 

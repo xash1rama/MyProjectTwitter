@@ -12,7 +12,9 @@ from sqlalchemy.orm import sessionmaker
 
 @pytest.fixture(scope="session")
 async def test_db():
-    os.environ["DATABASE_URL"] = "postgresql+asyncpg://test:test@postgres_container:5430/test_tweet_db"
+    os.environ[
+        "DATABASE_URL"
+    ] = "postgresql+asyncpg://test:test@postgres_container:5430/test_tweet_db"
     os.environ["ENV"] = "test"
     engine = create_async_engine(os.environ["DATABASE_URL"], echo=True)
     session = sessionmaker(
@@ -31,10 +33,9 @@ async def test_db():
         async_session.refresh(new_user1)
         async_session.refresh(new_user1)
         async_session.commit()
-        print("!"* 100, new_user1.name)
+        print("!" * 100, new_user1.name)
     yield async_session
     await engine.dispose()
-
 
 
 #
@@ -81,9 +82,8 @@ async def test_get_user_tweets(client, test_db):
     assert response.json()["result"] == True
 
 
-
 @pytest.mark.asyncio
-async def test_get_user_tweets_2(client,test_db):
+async def test_get_user_tweets_2(client, test_db):
     """Тест получения твитов второго пользоваителя"""
 
     response = await client.get("/api/tweets", headers={"api-key": "test_2"})

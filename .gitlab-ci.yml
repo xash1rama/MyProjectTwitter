@@ -36,8 +36,7 @@ isort:
   script:
     - isort --check-only --profile black app.py
     - isort --check-only --profile black schemas/
-    - isort --check-only --profile black database/database
-    - isort --check-only --profile black database/models
+    - isort --check-only --profile black database/
 
 black:
   stage: test
