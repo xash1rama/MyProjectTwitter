@@ -18,9 +18,8 @@ DB_NAME = os.getenv("DB_NAME")
 DB_URL = f"postgresql+asyncpg://admin:admin@postgresql_container:5432/tweet_db"
 
 
-def init_db(db_url):
-    engine = create_async_engine(db_url, echo=True)
-    session = sessionmaker(
+engine = create_async_engine(DB_URL, echo=True)
+session = sessionmaker(
         engine,
         class_=AsyncSession,
         expire_on_commit=False,
