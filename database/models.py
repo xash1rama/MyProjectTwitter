@@ -15,7 +15,7 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
 
-DB_URL = f"postgresql+asyncpg://admin:admin@postgresql_container:5432/tweet_db"
+DB_URL = f"postgresql+asyncpg://admin:admin@postgres:5432/tweet_db"
 
 
 engine = create_async_engine(DB_URL, echo=True)
