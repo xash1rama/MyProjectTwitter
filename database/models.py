@@ -24,10 +24,6 @@ session = sessionmaker(
         class_=AsyncSession,
         expire_on_commit=False,
     )
-    return engine, session
-
-
-engine, session = init_db(DB_URL)
 Base = declarative_base()
 
 
