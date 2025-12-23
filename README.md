@@ -1,4 +1,3 @@
-<img width="890" height="359" alt="image" src="https://github.com/user-attachments/assets/64f11d23-ea58-43bd-ab7d-6ab59ec75235" />
 
 # Установка приложения `twitter-clone` на локально
 
